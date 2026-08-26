@@ -6,3 +6,5 @@ __pycache__/
 .env
 output/
 smoke_output/
+codex-log
+codex-log.md
