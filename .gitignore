@@ -8,3 +8,4 @@ output/
 smoke_output/
 codex-log
 codex-log.md
+.venv-*/
