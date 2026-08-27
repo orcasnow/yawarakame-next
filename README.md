@@ -37,6 +37,8 @@ closingの最後の3発言はアプリケーション側で固定しています
 
 ## セットアップ
 
+別環境への取得からビルドまでの詳細な手順は [SETUP.md](SETUP.md) を参照してください。
+
 PowerShell:
 
 ```powershell
