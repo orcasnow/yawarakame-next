@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import re
-
+from yawarakame.constants import DRAW_PATTERNS, LOSS_PATTERNS, WIN_PATTERNS
 from yawarakame.models import MatchResult, TurnPlan
-
-
-LOSS_PATTERNS = re.compile(r"敗戦|敗れ|負け(?:た|る|試合)?|惨敗|完敗|連敗")
-DRAW_PATTERNS = re.compile(r"引き分け|ドロー|勝ち切れず|同点")
-WIN_PATTERNS = re.compile(r"勝利|勝った|勝ち試合|快勝|辛勝|連勝")
 
 
 def infer_result(topic: str) -> MatchResult | None:
@@ -26,19 +20,46 @@ def participant_ids(result: MatchResult) -> list[str]:
 
 
 REPORTER_MIDDLE_INTENTS = (
-    "直前の分析を短く整理し、根拠を具体化する質問をする",
-    "まだ扱っていない別の可能性または反例を提示して問い直す",
-    "ファン・サポーターが気になる点を示し、分析を求める",
-    "結果と内容を分けて評価できるよう、論点を一段掘り下げる",
-    "相手チーム側の狙いに視点を移し、説明を求める",
+    "直前の分析で最も気になる一点だけを聞く",
+    "短い反例を一つ示して問い直す",
+    "ファン・サポーターが気になる一点を尋ねる",
+    "結果と内容のどちらを重く見るか尋ねる",
+    "相手チームの狙いを一つ尋ねる",
 )
 
 ANALYST_MIDDLE_INTENTS = (
-    "直前の質問に答え、具体的な局面または戦術構造を一つ説明する",
-    "反例を認めるべき部分は認め、自分の評価を修正または補強する",
-    "個人のプレーとチーム全体の構造を分けて分析する",
-    "相手チームの良かった点を含め、別の角度から分析する",
-    "既出の説明を繰り返さず、次の論点になる観察を一つ加える",
+    "直前の質問へ結論から答え、根拠を一つ示す",
+    "反例を認めるか否かを短く答える",
+    "個人とチーム構造のどちらが大きいか答える",
+    "相手チームの良かった点を一つ挙げる",
+    "既出内容を繰り返さず、新しい観察を一つ述べる",
+)
+
+OPENING_INTENTS = (
+    (
+        "自己紹介だけを行い、これから試合を振り返ることを伝える。問題提起や疑問提示はしない",
+        "自己紹介だけを行う。試合結果への感想、分析、問題提起、疑問提示はしない",
+    ),
+    (
+        "試合結果とスコアを簡潔に整理し、観戦者と前提を共有する",
+        "結果を受け止め、勝敗または引き分けになった大きな流れを一言で述べる",
+    ),
+    (
+        "結果にまつわる軽いボケや雑談を一つ入れ、対談の空気をほぐす（1）",
+        "記者のボケや雑談に軽く反応し、結果についての感想を会話らしく返す（1）",
+    ),
+    (
+        "結果にまつわる軽いボケや雑談を一つ入れ、観戦時の印象を共有する（2）",
+        "記者の雑談を受け、結果に対する率直な感想をもう一つ返す（2）",
+    ),
+    (
+        "結果にまつわる軽いボケや雑談を一つ入れ、試合を振り返る視点へ戻す（3）",
+        "雑談に軽く応じたうえで、試合内容に目を向けるきっかけを示す（3）",
+    ),
+    (
+        "スターティングメンバーを確認し、そのメンバー構成について最初の評論を求める",
+        "スターティングメンバーの構成と、そこから見える狙いまたは気になる点を評論する",
+    ),
 )
 
 
@@ -58,20 +79,22 @@ class Director:
         is_reporter = turn_index % 2 == 0
         speaker_id = "reporter" if is_reporter else self.analyst_id
 
-        if round_index == 1:
-            phase = "opening"
-            intent = (
-                "テーマを簡潔に紹介し、観戦者が最初に気になる疑問を一つ提示する"
-                if is_reporter
-                else "テーマへの第一印象と暫定的な結論を述べ、主要因を一つ示す"
-            )
-        elif round_index == self.rounds:
+        closing_start = max(1, self.rounds - 4)
+        if round_index >= closing_start:
             phase = "synthesis" if is_reporter else "closing"
-            intent = (
-                "議論の一致点と残る論点を短くまとめ、最後の見通しを尋ねる"
-                if is_reporter
-                else "今後の見通しを述べ、キャラクターらしい挨拶で対談を締める"
-            )
+            final_turn = turn_index >= self.rounds * 2 - 3
+            if final_turn:
+                phase = "synthesis" if speaker_id == "reporter" else "closing"
+                intent = "固定の締め文をそのまま出力する"
+            else:
+                intent = (
+                    "議論の一致点と残る論点を短くまとめ、最後の見通しを尋ねる"
+                    if is_reporter
+                    else "今後の見通しを述べ、対談の締めに向けて話をまとめる"
+                )
+        elif round_index <= len(OPENING_INTENTS):
+            phase = "opening"
+            intent = OPENING_INTENTS[round_index - 1][0 if is_reporter else 1]
         elif round_index == self.rounds - 1 and self.rounds > 2:
             phase = "synthesis"
             intent = (
@@ -96,4 +119,3 @@ class Director:
             phase=phase,
             intent=intent,
         )
-

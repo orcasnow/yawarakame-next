@@ -26,6 +26,8 @@ def test_output_writer_creates_markdown_and_json(tmp_path: Path) -> None:
             decision_reason="test",
             sources=[Source(title="Example", url="https://example.com")],
         ),
+        good_points=["前半の守備が安定していた"],
+        improvement_points=["終盤の判断を改善したい"],
         turns=[
             DialogueTurn(
                 turn_index=0,
@@ -46,3 +48,7 @@ def test_output_writer_creates_markdown_and_json(tmp_path: Path) -> None:
     markdown = writer.markdown_path.read_text(encoding="utf-8")
     assert "**記**「振り返りましょう」" in markdown
     assert "[Example](https://example.com)" in markdown
+    assert "## この試合の良かったところ" in markdown
+    assert "- 前半の守備が安定していた" in markdown
+    assert "## この試合の(´ε｀；)ｳｰﾝ…" in markdown
+    assert "- 終盤の判断を改善したい" in markdown

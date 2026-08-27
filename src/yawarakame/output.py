@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from yawarakame.constants import AppDefaults
 from yawarakame.models import DialogueState
 
 
-def _safe_slug(topic: str, limit: int = 36) -> str:
+def _safe_slug(topic: str, limit: int = AppDefaults.OUTPUT_SLUG_LIMIT) -> str:
     slug = re.sub(r"[^0-9A-Za-zぁ-んァ-ヶ一-龠ー]+", "-", topic).strip("-")
     return (slug[:limit].rstrip("-") or "dialogue")
 
@@ -37,8 +38,37 @@ class OutputWriter:
             "## 対談",
             "",
         ]
+        closing_started = False
         for turn in state.turns:
+            if turn.phase == "closing" and not closing_started:
+                lines.extend([
+                    "## この試合の良かったところ",
+                    "",
+                    *[f"- {point}" for point in state.good_points],
+                    "",
+                    "## この試合の(´ε｀；)ｳｰﾝ…",
+                    "",
+                    *[f"- {point}" for point in state.improvement_points],
+                    "",
+                    "## 最後に",
+                    "",
+                ])
+                closing_started = True
             lines.extend([f"**{turn.label}**「{turn.text}」", ""])
+
+        if not closing_started:
+            lines.extend([
+                "## この試合の良かったところ",
+                "",
+                *[f"- {point}" for point in state.good_points],
+                "",
+                "## この試合の(´ε｀；)ｳｰﾝ…",
+                "",
+                *[f"- {point}" for point in state.improvement_points],
+                "",
+                "## 最後に",
+                "",
+            ])
 
         if state.research.sources:
             lines.extend(["## 参考情報", ""])

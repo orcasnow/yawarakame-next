@@ -2,24 +2,17 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 
 from openai import OpenAI
 
+from yawarakame.constants import ApiLimits, AppDefaults, EnvironmentVariables, SOCCER_MARKERS
 from yawarakame.director import infer_result, participant_ids
 from yawarakame.engine import DialogueEngine
 from yawarakame.errors import safe_error_message
 from yawarakame.models import MatchResult
 from yawarakame.research import decide_web_search
-
-
-SOCCER_MARKERS = re.compile(
-    r"サッカー|フットボール|Jリーグ|J[123]|グランパス|日本代表|代表戦|ワールドカップ|"
-    r"ACL|ACLE|天皇杯|ルヴァン|リーグ|試合|得点|失点|ゴール|選手|監督|フォーメーション|"
-    r"プレス|ビルドアップ|カウンター|守備|攻撃|順位|勝利|敗戦|引き分け"
-)
 
 
 def is_soccer_topic(topic: str) -> bool:
@@ -49,24 +42,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--result",
         choices=["auto", "win", "draw", "loss"],
-        default="auto",
+        default=AppDefaults.DEFAULT_RESULT,
         help="試合結果（既定: auto）",
     )
     parser.add_argument(
         "--rounds",
         type=int,
-        default=int(os.getenv("YAWARAKAME_ROUNDS", "15")),
-        help="往復数（既定: 15、発言数は2倍）",
+        default=int(os.getenv(EnvironmentVariables.ROUNDS, str(AppDefaults.DEFAULT_ROUNDS))),
+        help="往復数（既定: 30、発言数は2倍）",
     )
     parser.add_argument(
         "--model",
-        default=os.getenv("OPENAI_MODEL", "gpt-5.6-terra"),
+        default=os.getenv(EnvironmentVariables.MODEL, AppDefaults.DEFAULT_MODEL),
         help="OpenAIモデル",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(os.getenv("YAWARAKAME_OUTPUT_DIR", "output")),
+        default=Path(os.getenv(EnvironmentVariables.OUTPUT_DIR, AppDefaults.DEFAULT_OUTPUT_DIR)),
         help="Markdown/JSON出力先",
     )
     search_group = parser.add_mutually_exclusive_group()
@@ -85,7 +78,7 @@ def main(argv: list[str] | None = None) -> None:
         parser.error("対談テーマを入力してください")
     if not is_soccer_topic(topic):
         parser.error("サッカー以外のテーマは扱えません。サッカーに関するテーマを指定してください")
-    if not 1 <= args.rounds <= 30:
+    if not AppDefaults.MIN_ROUNDS <= args.rounds <= AppDefaults.MAX_ROUNDS:
         parser.error("--rounds は1〜30で指定してください")
 
     try:
@@ -110,15 +103,15 @@ def main(argv: list[str] | None = None) -> None:
     if args.plan_only:
         return
 
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv(EnvironmentVariables.API_KEY):
         parser.error("OPENAI_API_KEYが設定されていません")
 
-    client = OpenAI(timeout=120.0, max_retries=3)
+    client = OpenAI(timeout=ApiLimits.TIMEOUT_SECONDS, max_retries=ApiLimits.MAX_RETRIES)
     engine = DialogueEngine(
         client=client,
         model=args.model,
         output_dir=args.output_dir,
-        safety_identifier=os.getenv("OPENAI_SAFETY_IDENTIFIER"),
+        safety_identifier=os.getenv(EnvironmentVariables.SAFETY_IDENTIFIER),
     )
     state = engine.create_state(topic, result, args.rounds, search_required, reason)
     try:

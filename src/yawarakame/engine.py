@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from openai import OpenAI
 
+from yawarakame.constants import AppDefaults
 from yawarakame.actor import Actor, Summarizer
 from yawarakame.characters import load_characters
 from yawarakame.director import Director, participant_ids
@@ -79,9 +80,23 @@ class DialogueEngine:
 
             for turn_index in range(state.rounds * 2):
                 plan = director.plan(turn_index)
+                if plan.phase == "closing" and not state.good_points and not state.improvement_points:
+                    state.good_points, state.improvement_points = self.summarizer.review_points(state)
+                    writer.write(state)
                 character = self.characters[plan.speaker_id]
                 other_id = analyst_id if plan.speaker_id == "reporter" else "reporter"
-                text = self.actor.speak(character, other_id, state, plan)
+                fixed_texts = {
+                    (analyst_id, state.rounds * 2 - 3): (
+                        "おあとがよろしいようで" if analyst_id == "ninja" else "お後がよろしいようで"
+                    ),
+                    ("reporter", state.rounds * 2 - 2): "それではまた次の記事でお会いいたしましょう",
+                    (analyst_id, state.rounds * 2 - 1): (
+                        "ﾆﾝﾆﾝ" if analyst_id == "ninja" else "成敗！（Say-Bye！)"
+                    ),
+                }
+                text = fixed_texts.get((plan.speaker_id, turn_index)) or self.actor.speak(
+                    character, other_id, state, plan
+                )
                 turn = DialogueTurn(
                     turn_index=turn_index,
                     round_index=plan.round_index,
@@ -95,7 +110,7 @@ class DialogueEngine:
                 state.turns.append(turn)
                 print(f"\n{character.label}「{text}」", flush=True)
 
-                if len(state.turns) % 6 == 0 and turn_index < state.rounds * 2 - 1:
+                if len(state.turns) % AppDefaults.SUMMARY_INTERVAL == 0 and turn_index < state.rounds * 2 - 1:
                     state.rolling_summary = self.summarizer.update(state)
                     state.summarized_turn_count = len(state.turns)
                 writer.write(state)

@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from typing import Any
 
 from openai import OpenAI
 
+from yawarakame.constants import ApiLimits, CURRENT_MARKERS
 from yawarakame.models import ResearchPacket, Source
-
-
-CURRENT_MARKERS = re.compile(
-    r"今日|昨日|現在|現時点|最新|直近|今季|今シーズン|今節|次節|順位|成績|"
-    r"スタッツ|移籍|加入|退団|負傷|欠場|監督交代|メンバー|日程|結果|"
-    r"20\d{2}(?:年|[-/])|\d{1,2}月\d{1,2}日"
-)
 
 
 def decide_web_search(topic: str) -> tuple[bool, str]:
@@ -59,7 +52,7 @@ class Researcher:
             "model": self.model,
             "tools": [{"type": "web_search"}],
             "tool_choice": "auto",
-            "max_tool_calls": 3,
+            "max_tool_calls": ApiLimits.RESEARCH_MAX_TOOL_CALLS,
             "include": ["web_search_call.action.sources"],
             "store": False,
             "instructions": (

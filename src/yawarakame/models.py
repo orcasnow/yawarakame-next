@@ -95,6 +95,8 @@ class DialogueState(BaseModel):
     participants: list[str]
     status: DialogueStatus = DialogueStatus.PLANNED
     research: ResearchPacket
+    good_points: list[str] = Field(default_factory=list)
+    improvement_points: list[str] = Field(default_factory=list)
     rolling_summary: str = ""
     summarized_turn_count: int = 0
     turns: list[DialogueTurn] = Field(default_factory=list)
